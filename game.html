@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>魔鬼的計謀：得分五子棋</title>
+<style>
+  :root {
+    --ink: #f4f7fb;
+    --muted: #9aa6b5;
+    --panel: #161b22;
+    --panel-2: #10151b;
+    --line: #2a3340;
+    --red: #e23d3d;
+    --blue: #3d8bfd;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  body {
+    font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 22px 18px 36px;
+    background:
+      linear-gradient(180deg, #1b2430 0%, #0d1116 28%, #0b0e13 100%);
+  }
+
+  header {
+    text-align: left;
+    margin: 0 auto 14px;
+    width: 100%;
+    max-width: none;
+  }
+  .match-label {
+    display: inline-block;
+    margin-bottom: 6px;
+    padding: 2px 8px;
+    background: var(--red);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.25;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-top: 6px;
+  }
+
+  .game-container {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    justify-content: center;
+    align-items: flex-start;
+    max-width: none;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .board-wrapper {
+    padding: 10px;
+    background: #07090c;
+    border: 1px solid #2c3542;
+    border-top: 3px solid var(--red);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  }
+  canvas {
+    background:
+      radial-gradient(circle at 30% 18%, rgba(255, 244, 220, 0.28), transparent 40%),
+      #e4bc74;
+    cursor: pointer;
+    display: block;
+  }
+
+  .sidebar {
+    flex: 0 0 360px;
+    width: 360px;
+    max-width: 360px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  }
+  .card {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    padding: 14px 16px;
+  }
+  .card:last-child { border-bottom: 0; }
+  .card h2 {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.06em;
+  }
+  #round-tag {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--red);
+    padding: 2px 8px;
+    letter-spacing: 0;
+  }
+  .status-box {
+    background: var(--panel-2);
+    padding: 12px 12px 12px 14px;
+    border-left: 3px solid var(--red);
+    font-size: 0.95rem;
+    line-height: 1.65;
+    height: 92px;
+    overflow-y: auto;
+    color: #e8eef6;
+  }
+
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background: var(--panel-2);
+    border-left: 3px solid var(--red);
+  }
+  .identity.ai {
+    margin-bottom: 0;
+    border-left-color: var(--blue);
+  }
+  .mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid #d7dee8;
+  }
+  .mark.black { background: #1a1a1a; }
+  .mark.white { background: #fff; }
+  .who { flex: 1; min-width: 0; }
+  .who .role {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .who strong { font-weight: 700; font-size: 0.95rem; color: #fff; }
+  .piece-badge {
+    background: #0b0e13;
+    color: #fff;
+    padding: 4px 8px;
+    border: 1px solid #3a4656;
+    font-weight: 700;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .divider {
+    height: 1px;
+    margin: 12px 0;
+    background: var(--line);
+    border: 0;
+  }
+
+  .bet-controls { display: flex; flex-direction: column; gap: 10px; }
+  .bet-label {
+    font-size: 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .bet-label strong {
+    font-size: 1.15rem;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+  }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 6px;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--red) var(--fill, 7%), #ddd4c6 var(--fill, 7%));
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    background: var(--ink);
+    border: 2px solid var(--paper);
+  }
+  button {
+    font-family: inherit;
+    background: var(--red);
+    color: #fff;
+    border: 0;
+    padding: 9px 12px;
+    border-radius: 2px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.92rem;
+  }
+  button:hover:not(:disabled) { background: #9a2b24; }
+  button:active:not(:disabled) { background: #8d261f; }
+  button:disabled {
+    background: #2a3340;
+    color: #6d7886;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid #3a4656;
+  }
+  .btn-secondary:hover:not(:disabled) { background: #1d2631; }
+
+  .hint {
+    font-size: 0.86rem;
+    color: var(--muted);
+    line-height: 1.55;
+    margin-bottom: 10px;
+  }
+  .rps-row, .tool-row { display: flex; gap: 8px; }
+  .rps-row button, .tool-row button { flex: 1; }
+  .bet-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+  .bet-line input {
+    width: 92px;
+    font: inherit;
+    padding: 7px 8px;
+    border: 1px solid #3a4656;
+    border-radius: 0;
+    background: #0b0e13;
+    color: #fff;
+  }
+  .bet-line input:focus {
+    outline: 2px solid rgba(226, 61, 61, 0.45);
+    border-color: var(--red);
+  }
+  .action-slot { }
+
+  .rules-list {
+    font-size: 0.84rem;
+    color: #c5ced8;
+    padding-left: 1.1em;
+    line-height: 1.65;
+  }
+  .rules-list strong { color: #fff; font-weight: 700; }
+
+  @media (min-width: 821px) {
+    .board-wrapper { position: sticky; top: 18px; }
+  }
+  @media (max-width: 820px) {
+    body { padding: 16px 12px 28px; }
+    .board-wrapper { padding: 10px; }
+    .sidebar {
+      flex: 1 1 auto;
+      width: 100%;
+      max-width: none;
+      height: auto !important;
+      overflow: visible;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="match-label">對戰</p>
+  <h1>得分五子棋</h1>
+  <div class="subtitle">先猜拳。每回合加 10 皮斯，連下三顆，再暗標互蓋。</div>
+</header>
+
+<div class="game-container">
+  <div class="board-wrapper">
+    <canvas id="board" width="480" height="480"></canvas>
+  </div>
+
+  <div class="sidebar">
+    <div class="card">
+      <h2>現在 <span id="round-tag">第 1 回合</span></h2>
+      <div class="status-box" id="status-text">
+        先猜拳，決定誰當先手。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>籌碼</h2>
+      <div class="identity">
+        <div class="mark" id="player-mark" aria-hidden="true"></div>
+        <div class="who">
+          <span class="role" id="player-role">還沒猜拳</span>
+          <strong id="player-name">你</strong>
+        </div>
+        <span class="piece-badge" id="player-pieces">0 皮斯</span>
+      </div>
+      <div class="identity ai">
+        <div class="mark" id="ai-mark" aria-hidden="true"></div>
+        <div class="who">
+          <span class="role" id="ai-role">還沒猜拳</span>
+          <strong id="ai-name">對方</strong>
+        </div>
+        <span class="piece-badge" id="ai-pieces">不公開</span>
+      </div>
+
+      <hr class="divider">
+
+      <div class="action-slot">
+      <div id="rps-row" class="rps-row">
+        <button type="button" data-hand="rock">石頭</button>
+        <button type="button" data-hand="paper">布</button>
+        <button type="button" data-hand="scissors">剪刀</button>
+      </div>
+
+      <div id="place-row" hidden>
+        <p class="hint">在棋盤點三個空位，三顆要連成一線，中間不能空。</p>
+        <div class="tool-row">
+          <button class="btn-secondary" id="btn-clear" type="button">重選</button>
+          <button id="btn-place" type="button" disabled>確定這三顆</button>
+        </div>
+      </div>
+
+      <div id="bet-row" hidden>
+        <p class="hint" id="bet-hint">依棋盤上的 1、2、3 填皮斯，每顆至少 1。對方看不到數字。</p>
+        <label class="bet-line">第 1 顆 <input id="bet-0" type="number" min="1" step="1" value="1"></label>
+        <label class="bet-line">第 2 顆 <input id="bet-1" type="number" min="1" step="1" value="1"></label>
+        <label class="bet-line">第 3 顆 <input id="bet-2" type="number" min="1" step="1" value="1"></label>
+        <div class="bet-label"><span>合計</span><strong id="bet-sum">0</strong></div>
+        <button id="btn-bet" type="button">確認下注</button>
+      </div>
+      </div>
+
+      <div class="tool-row">
+        <button class="btn-secondary" id="btn-restart" type="button">重開一局</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>規則</h2>
+      <ul class="rules-list">
+        <li><strong>猜拳：</strong>贏的人當先手（黑棋），先下第 1 回合。後手是白棋，下第 2 回合。之後輪流。</li>
+        <li><strong>加皮斯：</strong>每個回合開始，兩邊各加 10 皮斯。</li>
+        <li><strong>落子：</strong>輪到的人要一次連下 3 顆，橫、直、斜都可以，中間不能空。</li>
+        <li><strong>暗標：</strong>落子的人先對這 3 顆各自下注，每顆至少 1 皮斯。換人時只看得到位置，看不到各顆下了多少。另一人跟著下注，大於或等於就蓋過那一顆。</li>
+        <li><strong>結算：</strong>兩邊沒用完的皮斯除以 2，小數直接捨去，留到下一回合再加 10。</li>
+        <li><strong>贏：</strong>自己的棋連成剛好 5 顆。超過 5 顆的那一線不算。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const GRID_SIZE = 13;
+let CELL = 480 / (GRID_SIZE + 1);
+const DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
+const HANDS = [
+  { id: 'rock', name: '石頭' },
+  { id: 'paper', name: '布' },
+  { id: 'scissors', name: '剪刀' }
+];
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status-text');
+const roundEl = document.getElementById('round-tag');
+const pPiecesEl = document.getElementById('player-pieces');
+const aPiecesEl = document.getElementById('ai-pieces');
+const playerRoleEl = document.getElementById('player-role');
+const aiRoleEl = document.getElementById('ai-role');
+const playerMark = document.getElementById('player-mark');
+const aiMark = document.getElementById('ai-mark');
+const rpsRow = document.getElementById('rps-row');
+const placeRow = document.getElementById('place-row');
+const betRow = document.getElementById('bet-row');
+const betHint = document.getElementById('bet-hint');
+const betSumEl = document.getElementById('bet-sum');
+const btnPlace = document.getElementById('btn-place');
+const btnBet = document.getElementById('btn-bet');
+const betInputs = [0, 1, 2].map(i => document.getElementById('bet-' + i));
+
+let board = [];
+let pieces = { 1: 0, 2: 0 };
+let playerSide = 0;
+let round = 0;
+let phase = 'RPS';
+let busy = false;
+let pending = [];
+let placerSide = 0;
+let hiddenBets = null;
+let timerToken = 0;
+let winMarks = [];
+
+function otherSide(side) { return side === 1 ? 2 : 1; }
+function sideColor(side) { return side === 1 ? '黑' : '白'; }
+function who(side) { return side === playerSide ? '你' : '對方'; }
+
+function initGame() {
+  board = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(0));
+  pieces = { 1: 0, 2: 0 };
+  playerSide = 0;
+  round = 0;
+  phase = 'RPS';
+  busy = false;
+  timerToken += 1;
+  pending = [];
+  placerSide = 0;
+  hiddenBets = null;
+  winMarks = [];
+  betInputs.forEach(input => { input.value = '1'; });
+  updateUI();
+  setStatus('先猜拳，決定誰當先手。贏的人是黑棋，先下第 1 回合。');
+  drawBoard();
+}
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function updateUI() {
+  roundEl.textContent = phase === 'RPS' ? '猜拳' : `第 ${round} 回合`;
+  const you = playerSide ? pieces[playerSide] : 0;
+  pPiecesEl.textContent = `${you} 皮斯`;
+  aPiecesEl.textContent = '不公開';
+
+  if (!playerSide) {
+    playerRoleEl.textContent = '還沒猜拳';
+    aiRoleEl.textContent = '還沒猜拳';
+    playerMark.style.background = '#cfc6b8';
+    aiMark.style.background = '#cfc6b8';
+  } else {
+    const youBlack = playerSide === 1;
+    playerRoleEl.textContent = youBlack ? '先手' : '後手';
+    aiRoleEl.textContent = youBlack ? '後手' : '先手';
+    playerMark.style.background = youBlack ? '#1a1a1a' : '#fff';
+    aiMark.style.background = youBlack ? '#fff' : '#1a1a1a';
+  }
+
+  rpsRow.hidden = phase !== 'RPS';
+  placeRow.hidden = !(phase === 'PLACE' && placerSide === playerSide);
+  betRow.hidden = phase !== 'BET';
+  btnPlace.disabled = !orient(pending);
+  refreshBetSum();
+}
+
+function onBoard(r, c) {
+  return r >= 0 && c >= 0 && r < GRID_SIZE && c < GRID_SIZE;
+}
+
+function orient(cells) {
+  if (cells.length !== 3) return null;
+  const pts = cells.map(p => ({ r: p.r, c: p.c }));
+  const key = p => p.r + ',' + p.c;
+  const have = new Set(pts.map(key));
+  if (have.size !== 3) return null;
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      if (i === j) continue;
+      const dr = pts[j].r - pts[i].r;
+      const dc = pts[j].c - pts[i].c;
+      const dist = Math.max(Math.abs(dr), Math.abs(dc));
+      if (dist !== 2) continue;
+      if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) continue;
+      const stepR = dr / 2;
+      const stepC = dc / 2;
+      const line = [0, 1, 2].map(k => ({ r: pts[i].r + stepR * k, c: pts[i].c + stepC * k }));
+      if (!line.every(p => have.has(key(p)))) continue;
+      const endR = line[2].r - line[0].r;
+      const endC = line[2].c - line[0].c;
+      if (endC < 0 || (endC === 0 && endR < 0)) line.reverse();
+      return line;
+    }
+  }
+  return null;
+}
+
+function hasExactFive(side) {
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (board[r][c] !== side) continue;
+      for (const [dr, dc] of DIRS) {
+        const pr = r - dr;
+        const pc = c - dc;
+        if (onBoard(pr, pc) && board[pr][pc] === side) continue;
+        let len = 0;
+        let rr = r;
+        let cc = c;
+        while (onBoard(rr, cc) && board[rr][cc] === side) {
+          len += 1;
+          rr += dr;
+          cc += dc;
+        }
+        if (len === 5) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function exactFiveCells(side) {
+  const marks = [];
+  const seen = new Set();
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (board[r][c] !== side) continue;
+      for (const [dr, dc] of DIRS) {
+        const pr = r - dr;
+        const pc = c - dc;
+        if (onBoard(pr, pc) && board[pr][pc] === side) continue;
+        const run = [];
+        let rr = r;
+        let cc = c;
+        while (onBoard(rr, cc) && board[rr][cc] === side) {
+          run.push({ r: rr, c: cc });
+          rr += dr;
+          cc += dc;
+        }
+        if (run.length !== 5) continue;
+        run.forEach(cell => {
+          const key = cell.r + ',' + cell.c;
+          if (seen.has(key)) return;
+          seen.add(key);
+          marks.push(cell);
+        });
+      }
+    }
+  }
+  return marks;
+}
+
+function coverText(placeBets, counterBets) {
+  const counterSide = otherSide(placerSide);
+  return placeBets.map((placeBet, i) => {
+    const covered = counterBets[i] >= placeBet;
+    const owner = covered ? counterSide : placerSide;
+    const mine = playerSide === placerSide ? placeBet : counterBets[i];
+    return `第${i + 1}顆你下 ${mine}，${owner === playerSide ? '這顆是你的' : '這顆被拿走'}`;
+  }).join('。');
+}
+
+function hasRunAtLeast(side, need) {
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (board[r][c] !== side) continue;
+      for (const [dr, dc] of DIRS) {
+        const pr = r - dr;
+        const pc = c - dc;
+        if (onBoard(pr, pc) && board[pr][pc] === side) continue;
+        let len = 0;
+        let rr = r;
+        let cc = c;
+        while (onBoard(rr, cc) && board[rr][cc] === side) {
+          len += 1;
+          rr += dr;
+          cc += dc;
+        }
+        if (len >= need) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function emptySegments() {
+  const segs = [];
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      for (const [dr, dc] of DIRS) {
+        const cells = [0, 1, 2].map(k => ({ r: r + dr * k, c: c + dc * k }));
+        if (cells.every(p => onBoard(p.r, p.c) && board[p.r][p.c] === 0)) segs.push(cells);
+      }
+    }
+  }
+  return segs;
+}
+
+function readBets() {
+  const bets = betInputs.map(input => {
+    const n = Math.floor(Number(input.value));
+    return Number.isFinite(n) ? n : -1;
+  });
+  const sum = bets.reduce((a, b) => a + b, 0);
+  const cap = pieces[playerSide];
+  if (bets.some(n => n < 1) || sum > cap) return null;
+  return bets;
+}
+
+function refreshBetSum() {
+  if (phase !== 'BET') return;
+  const bets = betInputs.map(input => {
+    const n = Math.floor(Number(input.value));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  });
+  const sum = bets.reduce((a, b) => a + b, 0);
+  betSumEl.textContent = `${sum} / ${pieces[playerSide]}`;
+  btnBet.disabled = readBets() === null;
+}
+
+function splitBets(total) {
+  const bets = [1, 1, 1];
+  const extra = Math.max(0, total - 3);
+  const spendExtra = extra <= 0 ? 0 : Math.min(extra, Math.round(extra * (0.55 + Math.random() * 0.4)));
+  let left = spendExtra;
+  const order = [0, 1, 2].sort(() => Math.random() - 0.5);
+  const hot = Math.min(left, Math.ceil(left * (0.45 + Math.random() * 0.4)));
+  bets[order[0]] += hot;
+  left -= hot;
+  const second = Math.floor(left * Math.random());
+  bets[order[1]] += second;
+  bets[order[2]] += left - second;
+  return bets;
+}
+
+function chooseSegment(side) {
+  const segs = emptySegments();
+  if (!segs.length) return null;
+  const opp = otherSide(side);
+  let best = segs[0];
+  let bestScore = -Infinity;
+  segs.forEach(cells => {
+    let score = Math.random() * 1.5;
+    cells.forEach(p => {
+      score += 2.2 - (Math.abs(p.r - 6) + Math.abs(p.c - 6)) * 0.12;
+      DIRS.forEach(([dr, dc]) => {
+        [[1, dr, dc], [1, -dr, -dc]].forEach(([, sr, sc]) => {
+          const nr = p.r + sr;
+          const nc = p.c + sc;
+          if (!onBoard(nr, nc)) return;
+          if (board[nr][nc] === side) score += 2.4;
+          if (board[nr][nc] === opp) score += 1.3;
+        });
+      });
+    });
+    const saved = cells.map(p => board[p.r][p.c]);
+    cells.forEach(p => { board[p.r][p.c] = side; });
+    if (hasExactFive(side)) score += 40;
+    if (hasRunAtLeast(side, 6)) score -= 18;
+    cells.forEach(p => { board[p.r][p.c] = opp; });
+    if (hasExactFive(opp)) score += 16;
+    cells.forEach((p, i) => { board[p.r][p.c] = saved[i]; });
+    if (score > bestScore) {
+      bestScore = score;
+      best = cells;
+    }
+  });
+  return orient(best);
+}
+
+function playRps(handId) {
+  if (phase !== 'RPS' || busy) return;
+  const ai = HANDS[Math.floor(Math.random() * 3)];
+  const you = HANDS.find(h => h.id === handId);
+  const win = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
+  if (you.id === ai.id) {
+    setStatus(`你出${you.name}，對方也出${ai.name}。平手，再猜一次。`);
+    return;
+  }
+  playerSide = win[you.id] === ai.id ? 1 : 2;
+  const youFirst = playerSide === 1;
+  beginRound(`你出${you.name}，對方出${ai.name}。${youFirst ? '你是先手（黑棋）。' : '你是後手（白棋）。'}`);
+}
+
+function beginRound(note) {
+  round += 1;
+  pieces[1] += 10;
+  pieces[2] += 10;
+  placerSide = round % 2 === 1 ? 1 : 2;
+  pending = [];
+  hiddenBets = null;
+  phase = 'PLACE';
+  updateUI();
+  const lead = `${note ? note + ' ' : ''}第 ${round} 回合由${who(placerSide)}落子。你現在 ${pieces[playerSide]} 皮斯。`;
+  if (placerSide === playerSide) {
+    setStatus(lead + '請在棋盤連下三顆。');
+    drawBoard();
+    return;
+  }
+  setStatus(lead + '對方正在放棋。');
+  drawBoard();
+  busy = true;
+  const token = timerToken;
+  setTimeout(() => {
+    if (token !== timerToken) return;
+    aiPlace(lead);
+  }, 500);
+}
+
+function aiPlace(lead) {
+  const cells = chooseSegment(placerSide);
+  busy = false;
+  if (!cells) {
+    phase = 'GAMEOVER';
+    updateUI();
+    setStatus((lead ? lead + ' ' : '') + '棋盤沒有地方再連下三顆，這局平手。');
+    drawBoard();
+    return;
+  }
+  pending = cells;
+  hiddenBets = splitBets(pieces[placerSide]);
+  phase = 'BET';
+  betInputs.forEach(input => { input.value = '1'; });
+  betHint.textContent = '對方已放好 1、2、3。每顆至少下 1。你看不到對方各顆下了多少，大於或等於就蓋過那一顆。';
+  updateUI();
+  setStatus((lead ? lead + ' ' : '') + '換你下注。看得到位置，看不到對方各顆的數字。');
+  drawBoard();
+}
+
+function confirmPlace() {
+  const line = orient(pending);
+  if (phase !== 'PLACE' || placerSide !== playerSide || !line) return;
+  pending = line;
+  phase = 'BET';
+  betInputs.forEach(input => { input.value = '1'; });
+  betHint.textContent = '依棋盤上的 1、2、3 填皮斯，每顆至少 1。對方還沒看到數字。';
+  updateUI();
+  setStatus('這三顆確定了。填每顆要下的皮斯，再按確認。');
+  drawBoard();
+}
+
+function confirmBet() {
+  const bets = readBets();
+  if (phase !== 'BET' || !bets || busy) return;
+  if (placerSide === playerSide) {
+    hiddenBets = bets;
+    phase = 'WAIT';
+    updateUI();
+    setStatus(`你下了 ${bets.join('、')}。對方正在跟注。`);
+    drawBoard();
+    busy = true;
+    const token = timerToken;
+    setTimeout(() => {
+      if (token !== timerToken) return;
+      busy = false;
+      resolveBets(hiddenBets, splitBets(pieces[otherSide(placerSide)]));
+    }, 450);
+    return;
+  }
+  resolveBets(hiddenBets, bets);
+}
+
+function resolveBets(placeBets, counterBets) {
+  const counterSide = otherSide(placerSide);
+  const owners = pending.map((cell, i) => counterBets[i] >= placeBets[i] ? counterSide : placerSide);
+  owners.forEach((owner, i) => {
+    board[pending[i].r][pending[i].c] = owner;
+  });
+  const spent = { [placerSide]: placeBets.reduce((a, b) => a + b, 0), [counterSide]: counterBets.reduce((a, b) => a + b, 0) };
+  const half = {
+    1: Math.floor((pieces[1] - spent[1]) / 2),
+    2: Math.floor((pieces[2] - spent[2]) / 2)
+  };
+  pieces[1] = half[1];
+  pieces[2] = half[2];
+  const detail = coverText(placeBets, counterBets);
+  pending = [];
+  hiddenBets = null;
+  const youWin = hasExactFive(playerSide);
+  const oppWin = hasExactFive(otherSide(playerSide));
+  if (youWin || oppWin) {
+    phase = 'GAMEOVER';
+    winMarks = [];
+    if (youWin) winMarks.push(...exactFiveCells(playerSide));
+    if (oppWin) winMarks.push(...exactFiveCells(otherSide(playerSide)));
+    updateUI();
+    drawBoard();
+    const headline = youWin && oppWin ? '兩邊都連成剛好五顆，這局平手。' : youWin ? '你連成剛好五顆，你贏了。' : '對方連成剛好五顆，對方贏了。';
+    setStatus(`${headline}${detail}。`);
+    return;
+  }
+  const youHalf = half[playerSide];
+  const note = `${detail}。你沒用完的先除以 2，剩下 ${youHalf}。`;
+  beginRound(note);
+}
+
+function cellFromEvent(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+  return {
+    r: Math.round(y / CELL) - 1,
+    c: Math.round(x / CELL) - 1
+  };
+}
+
+function drawStone(r, c, owner, label) {
+  const x = CELL * (c + 1);
+  const y = CELL * (r + 1);
+  const radius = CELL * 0.38;
+  const gloss = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.4, radius * 0.1, x, y, radius);
+  if (owner === 1) {
+    gloss.addColorStop(0, '#5c5c5c');
+    gloss.addColorStop(1, '#141414');
+  } else if (owner === 2) {
+    gloss.addColorStop(0, '#ffffff');
+    gloss.addColorStop(1, '#d5d5d5');
+  } else {
+    gloss.addColorStop(0, '#fffaf0');
+    gloss.addColorStop(1, '#f0d7a4');
+  }
+  ctx.save();
+  ctx.shadowColor = 'rgba(50, 28, 10, 0.28)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = gloss;
+  ctx.fill();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = owner === 2 ? '#b7b7b7' : 'rgba(36, 28, 22, 0.45)';
+  ctx.stroke();
+  if (label) {
+    ctx.fillStyle = owner === 1 ? '#fff' : '#241c16';
+    ctx.font = `700 ${Math.max(13, Math.round(CELL * 0.38))}px Microsoft JhengHei, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(label), x, y + 0.5);
+  }
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = 'rgba(62, 38, 18, 0.9)';
+  ctx.lineWidth = 1.15;
+  for (let i = 0; i < GRID_SIZE; i++) {
+    const pos = CELL * (i + 1);
+    ctx.beginPath();
+    ctx.moveTo(CELL, pos);
+    ctx.lineTo(CELL * GRID_SIZE, pos);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos, CELL);
+    ctx.lineTo(pos, CELL * GRID_SIZE);
+    ctx.stroke();
+  }
+  [3, 6, 9].forEach(r => [3, 6, 9].forEach(c => {
+    ctx.beginPath();
+    ctx.arc(CELL * (c + 1), CELL * (r + 1), Math.max(3.2, CELL * 0.1), 0, Math.PI * 2);
+    ctx.fillStyle = '#2a1a0e';
+    ctx.fill();
+  }));
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (board[r][c] !== 0) drawStone(r, c, board[r][c]);
+    }
+  }
+  const line = orient(pending);
+  const marks = line || pending;
+  marks.forEach((p, i) => {
+    const owner = phase === 'BET' || phase === 'WAIT' ? placerSide : 0;
+    drawStone(p.r, p.c, owner, line ? i + 1 : '');
+  });
+  winMarks.forEach(cell => {
+    const x = CELL * (cell.c + 1);
+    const y = CELL * (cell.r + 1);
+    ctx.beginPath();
+    ctx.arc(x, y, CELL * 0.46, 0, Math.PI * 2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#e23d3d';
+    ctx.stroke();
+  });
+}
+
+canvas.addEventListener('click', (event) => {
+  if (busy || phase !== 'PLACE' || placerSide !== playerSide) return;
+  const { r, c } = cellFromEvent(event);
+  if (!onBoard(r, c)) return;
+  if (board[r][c] !== 0) {
+    setStatus('這裡已經有棋了。');
+    return;
+  }
+  const idx = pending.findIndex(p => p.r === r && p.c === c);
+  if (idx >= 0) pending.splice(idx, 1);
+  else if (pending.length < 3) pending.push({ r, c });
+  else {
+    setStatus('已經選了三顆。可以重選，或按確定。');
+    return;
+  }
+  updateUI();
+  if (pending.length === 3 && !orient(pending)) setStatus('這三顆沒有連成一線。');
+  else if (pending.length < 3) setStatus(`已選 ${pending.length} 顆，還要 ${3 - pending.length} 顆。`);
+  else setStatus('這三顆連成一線了。按確定。');
+  drawBoard();
+});
+
+rpsRow.addEventListener('click', (event) => {
+  const btn = event.target.closest('button');
+  if (!btn) return;
+  playRps(btn.dataset.hand);
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (phase !== 'PLACE' || placerSide !== playerSide) return;
+  pending = [];
+  updateUI();
+  setStatus('已清掉。重新點三個空位。');
+  drawBoard();
+});
+
+btnPlace.addEventListener('click', confirmPlace);
+btnBet.addEventListener('click', confirmBet);
+betInputs.forEach(input => input.addEventListener('input', refreshBetSum));
+document.getElementById('btn-restart').addEventListener('click', initGame);
+
+function fitBoard() {
+  const container = document.querySelector('.game-container');
+  const sidebar = document.querySelector('.sidebar');
+  const wrap = document.querySelector('.board-wrapper');
+  const style = getComputedStyle(wrap);
+  const extra = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+  const wide = window.innerWidth > 820;
+  if (!wide) {
+    sidebar.style.height = 'auto';
+    wrap.style.width = '';
+    wrap.style.height = '';
+    const size = Math.round(Math.min(window.innerWidth * 0.92, 720));
+    if (canvas.width !== size || canvas.height !== size) {
+      canvas.width = size;
+      canvas.height = size;
+      CELL = size / (GRID_SIZE + 1);
+      drawBoard();
+    }
+    return;
+  }
+  const gap = 22;
+  const availW = container.clientWidth - sidebar.offsetWidth - gap;
+  const availH = window.innerHeight - container.getBoundingClientRect().top - 20;
+  const outer = Math.max(360, Math.floor(Math.min(availW, availH)));
+  const size = Math.max(280, outer - extra);
+  wrap.style.width = outer + 'px';
+  wrap.style.height = outer + 'px';
+  sidebar.style.height = outer + 'px';
+  if (canvas.width === size && canvas.height === size) return;
+  canvas.width = size;
+  canvas.height = size;
+  CELL = size / (GRID_SIZE + 1);
+  drawBoard();
+}
+
+initGame();
+fitBoard();
+window.addEventListener('resize', fitBoard);
+</script>
+</body>
+</html>
