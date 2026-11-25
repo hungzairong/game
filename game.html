@@ -366,7 +366,7 @@
         <li><strong>落子：</strong>輪到的人要一次連下 3 顆，橫、直、斜都可以，中間不能空。</li>
         <li><strong>暗標：</strong>落子的人先對這 3 顆各自下注，每顆至少 1 皮斯。換人時只看得到位置，看不到各顆下了多少。另一人跟著下注，大於或等於就蓋過那一顆。</li>
         <li><strong>結算：</strong>兩邊沒用完的皮斯除以 2，小數直接捨去，留到下一回合再加 10。</li>
-        <li><strong>贏：</strong>自己的棋連成剛好 5 顆。超過 5 顆的那一線不算。</li>
+        <li><strong>贏：</strong>剛好五顆連成一線算 1 條，超過五顆的那一線不算。誰的五連比較多，誰就贏。兩邊一樣多就繼續下。棋盤滿了、沒地方再連下三顆，才算和局。</li>
       </ul>
     </div>
   </div>
@@ -496,7 +496,8 @@ function orient(cells) {
   return null;
 }
 
-function hasExactFive(side) {
+function countExactFives(side) {
+  let count = 0;
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
       if (board[r][c] !== side) continue;
@@ -512,11 +513,15 @@ function hasExactFive(side) {
           rr += dr;
           cc += dc;
         }
-        if (len === 5) return true;
+        if (len === 5) count += 1;
       }
     }
   }
-  return false;
+  return count;
+}
+
+function hasExactFive(side) {
+  return countExactFives(side) > 0;
 }
 
 function exactFiveCells(side) {
@@ -713,7 +718,7 @@ function aiPlace(lead) {
   if (!cells) {
     phase = 'GAMEOVER';
     updateUI();
-    setStatus((lead ? lead + ' ' : '') + '棋盤沒有地方再連下三顆，這局平手。');
+    setStatus((lead ? lead + ' ' : '') + '棋盤沒有地方再連下三顆，這局和局。');
     drawBoard();
     return;
   }
@@ -776,21 +781,31 @@ function resolveBets(placeBets, counterBets) {
   const detail = coverText(placeBets, counterBets);
   pending = [];
   hiddenBets = null;
-  const youWin = hasExactFive(playerSide);
-  const oppWin = hasExactFive(otherSide(playerSide));
-  if (youWin || oppWin) {
+  const youLines = countExactFives(playerSide);
+  const oppLines = countExactFives(otherSide(playerSide));
+  const youHalf = half[playerSide];
+  if (youLines !== oppLines) {
     phase = 'GAMEOVER';
-    winMarks = [];
-    if (youWin) winMarks.push(...exactFiveCells(playerSide));
-    if (oppWin) winMarks.push(...exactFiveCells(otherSide(playerSide)));
+    const winner = youLines > oppLines ? playerSide : otherSide(playerSide);
+    winMarks = exactFiveCells(winner);
     updateUI();
     drawBoard();
-    const headline = youWin && oppWin ? '兩邊都連成剛好五顆，這局平手。' : youWin ? '你連成剛好五顆，你贏了。' : '對方連成剛好五顆，對方贏了。';
+    const headline = youLines > oppLines
+      ? `你有 ${youLines} 條五連，對方有 ${oppLines} 條，你贏了。`
+      : `對方有 ${oppLines} 條五連，你有 ${youLines} 條，對方贏了。`;
     setStatus(`${headline}${detail}。`);
     return;
   }
-  const youHalf = half[playerSide];
-  const note = `${detail}。你沒用完的先除以 2，剩下 ${youHalf}。`;
+  let note = `${detail}。你沒用完的先除以 2，剩下 ${youHalf}。`;
+  if (youLines > 0) note += `兩邊都是 ${youLines} 條五連，這局繼續。`;
+  if (!emptySegments().length) {
+    phase = 'GAMEOVER';
+    winMarks = exactFiveCells(playerSide).concat(exactFiveCells(otherSide(playerSide)));
+    updateUI();
+    drawBoard();
+    setStatus(`${note}棋盤沒有地方再連下三顆，這局和局。`);
+    return;
+  }
   beginRound(note);
 }
 
